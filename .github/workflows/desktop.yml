@@ -1,0 +1,103 @@
+name: Desktop Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  release:
+    types: [created]
+
+env:
+  APP_NAME: ImageGenGUI
+  ELECTRON_DIR: electron
+  WEBUI_DIR: webui
+  PY_DIR: python/generator
+
+jobs:
+  build-artifacts:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [18.x]
+        go-version: [1.20]
+        python-version: [3.11]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Go deps
+        run: |
+          cd .
+          go mod tidy
+
+      - name: Build Go binary (platform specific)
+        run: |
+          set -e
+          OUT=worker
+          case "${{ matrix.os }}" in
+            *windows*) OUT=worker.exe ;;
+          esac
+          GOOS=$(echo "${{ matrix.os }}" | sed -e 's/-latest//') # ubuntu/windows/macos mapping handled by runner
+          # Use cross-compilation env for linux/windows/macos where possible
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            GOOS=windows; GOARCH=amd64
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            GOOS=darwin; GOARCH=amd64
+          else
+            GOOS=linux; GOARCH=amd64
+          fi
+          env GOOS=$GOOS GOARCH=$GOARCH go build -o electron/resources/$OUT ./cmd/gui
+
+      - name: Build Python standalone (PyInstaller)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          mkdir -p electron/resources/python
+          # create a tiny wrapper script that reads stdin and runs generator
+          cp ${PY_DIR}/app.py electron/resources/python/app.py
+          # bundle with PyInstaller (onefile)
+          pyinstaller --onefile --distpath electron/resources/python electron/resources/python/app.py
+          # pyinstaller outputs a single executable named app (or app.exe on Windows)
+          ls -la electron/resources/python
+
+      - name: Prepare webui into electron
+        run: |
+          rm -rf electron/app
+          mkdir -p electron/app
+          cp -r ${WEBUI_DIR}/* electron/app/
+
+      - name: Install electron deps
+        working-directory: electron
+        run: |
+          npm ci
+
+      - name: Build Electron app (dist)
+        working-directory: electron
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD || '' }}
+        run: |
+          # electron-builder will create platform-specific installers
+          npm run dist -- --publish never
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: electron/dist
