@@ -1,0 +1,5 @@
+body { font-family: Arial, sans-serif; background:#f7f7f7; color:#222; }
+.container { max-width:900px; margin:40px auto; padding:20px; background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+.grid { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+.grid img { width:200px; height:200px; object-fit:cover; border-radius:6px; border:1px solid #ddd; }
+#status { margin-top:12px; color:#555; }
