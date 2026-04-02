@@ -1,0 +1,39 @@
+{
+  "name": "image-gen-gui-desktop",
+  "version": "0.1.0",
+  "description": "Image Gen GUI - Desktop wrapper",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "author": "Autonomous Architect",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^26.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.yourorg.imagegengui",
+    "productName": "ImageGenGUI",
+    "files": [
+      "app/**",
+      "main.js",
+      "preload.js",
+      "resources/**"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "target": ["dmg","zip"]
+    },
+    "win": {
+      "target": ["nsis","zip"]
+    },
+    "linux": {
+      "target": ["AppImage","deb"]
+    }
+  }
+}
+  
